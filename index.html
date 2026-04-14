@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cherry Blossom in the GTA</title>
+
+    <!-- Bootstrap 5 -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+
+    <!-- Leaflet (map) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* --- Theme (CSS variables) --- */
+      :root {
+        --sakura-pink: #f4b8d0;
+        --blush: #fff5f9;
+        --white: #ffffff;
+        --muted-green: #a8c4a2;
+        --text-soft: #5c4a52;
+        --text-heading: #4a2f3d;
+        --shadow-soft: 0 10px 30px rgba(74, 47, 61, 0.1);
+        --shadow-lift: 0 14px 36px rgba(74, 47, 61, 0.14);
+      }
+
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        color: var(--text-soft);
+        background: linear-gradient(180deg, var(--blush) 0%, var(--white) 45%);
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        font-family: "Cormorant Garamond", Georgia, serif;
+        color: var(--text-heading);
+      }
+
+      /* --- Hero --- */
+      .hero {
+        background: linear-gradient(
+          135deg,
+          rgba(244, 184, 208, 0.55) 0%,
+          rgba(255, 245, 249, 0.95) 50%,
+          rgba(168, 196, 162, 0.25) 100%
+        );
+        border-bottom: 1px solid rgba(74, 47, 61, 0.08);
+      }
+
+      .hero-icon {
+        color: #d9729a;
+      }
+
+      /* --- Cards & utilities --- */
+      .soft-card {
+        border: none;
+        border-radius: 20px;
+        background: var(--white);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .intro-credit {
+        font-size: 0.95rem;
+        color: #7a5f6a;
+      }
+
+      .link-accent {
+        color: #b84d78;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .link-accent:hover {
+        color: #8f3458;
+        text-decoration: underline;
+      }
+
+      .search-input,
+      .sort-select {
+        border-radius: 14px;
+        border: 1px solid rgba(74, 47, 61, 0.15);
+      }
+
+      .search-input:focus,
+      .sort-select:focus {
+        border-color: var(--sakura-pink);
+        box-shadow: 0 0 0 0.2rem rgba(244, 184, 208, 0.35);
+      }
+
+      /* --- Featured carousel (horizontal scroll) --- */
+      .carousel-track {
+        display: flex;
+        gap: 1rem;
+        overflow-x: auto;
+        padding: 0.25rem 0.25rem 0.75rem;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .carousel-track::-webkit-scrollbar {
+        height: 6px;
+      }
+
+      .carousel-track::-webkit-scrollbar-thumb {
+        background: rgba(184, 77, 120, 0.35);
+        border-radius: 999px;
+      }
+
+      .featured-card {
+        flex: 0 0 min(280px, 85vw);
+        scroll-snap-align: start;
+        border-radius: 18px;
+        border: 1px solid rgba(74, 47, 61, 0.08);
+        background: var(--white);
+        box-shadow: var(--shadow-soft);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .featured-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lift);
+      }
+
+      .badge-sakura {
+        background: linear-gradient(135deg, #ffe0ec, #f4d4e8);
+        color: #7a3555;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 0.35rem 0.65rem;
+        font-size: 0.72rem;
+      }
+
+      /* --- Map --- */
+      #map {
+        height: 380px;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid rgba(74, 47, 61, 0.08);
+        z-index: 1;
+      }
+
+      @media (max-width: 767.98px) {
+        #map {
+          height: 300px;
+        }
+      }
+
+      .map-note {
+        font-size: 0.85rem;
+        color: #7a6b72;
+      }
+
+      /* --- Table --- */
+      .table-wrap {
+        border-radius: 16px;
+        overflow: hidden;
+      }
+
+      .table thead {
+        background: linear-gradient(180deg, #ffe8f0, #fff5f9);
+      }
+
+      .table td,
+      .table th {
+        vertical-align: middle;
+      }
+
+      /* --- Mobile list cards --- */
+      .spot-card {
+        border-radius: 16px;
+        border: 1px solid rgba(74, 47, 61, 0.1);
+        background: var(--white);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .spot-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-soft);
+      }
+
+      /* --- Floating plan button --- */
+      .btn-floating-plan {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 1040;
+        border-radius: 999px;
+        padding: 0.65rem 1.15rem;
+        background: linear-gradient(135deg, #e878a8, #d45d8f);
+        color: #fff;
+        border: none;
+        box-shadow: 0 12px 28px rgba(212, 93, 143, 0.45);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn-floating-plan:hover {
+        color: #fff;
+        transform: translateY(-3px);
+        box-shadow: 0 16px 34px rgba(212, 93, 143, 0.5);
+      }
+
+      .plan-count-badge {
+        background: #fff;
+        color: #c43d73;
+        font-weight: 700;
+      }
+
+      /* --- Sidebar + overlay --- */
+      .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(40, 24, 32, 0.45);
+        z-index: 1045;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
+      }
+
+      .sidebar-overlay.show {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .plan-sidebar {
+        position: fixed;
+        top: 0;
+        right: -400px;
+        width: min(380px, 94vw);
+        height: 100vh;
+        background: #fffdfb;
+        z-index: 1050;
+        box-shadow: -12px 0 40px rgba(0, 0, 0, 0.12);
+        border-left: 1px solid rgba(74, 47, 61, 0.1);
+        transition: right 0.3s ease;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .plan-sidebar.open {
+        right: 0;
+      }
+
+      .sidebar-head {
+        background: linear-gradient(120deg, #ffeef5, #f8fff6);
+        border-bottom: 1px solid rgba(74, 47, 61, 0.08);
+      }
+
+      .plan-scroll {
+        overflow-y: auto;
+      }
+
+      .plan-item {
+        border-radius: 14px;
+        border: 1px solid rgba(74, 47, 61, 0.1);
+        background: var(--white);
+      }
+
+      .btn-share-soft {
+        background: #ffe8f0;
+        color: #7a3555;
+        border: 1px solid #f4c4d8;
+      }
+
+      .btn-share-soft:hover {
+        background: #ffdce8;
+        color: #5c2640;
+      }
+
+      /* --- Empty states --- */
+      .empty-pill {
+        border: 1px dashed rgba(184, 77, 120, 0.35);
+        border-radius: 16px;
+        background: rgba(255, 245, 249, 0.8);
+      }
+
+      /* --- Footer --- */
+      .site-footer {
+        background: linear-gradient(180deg, #fff8fb, var(--white));
+        border-top: 1px solid rgba(74, 47, 61, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ========== 1. Hero ========== -->
+    <header class="hero py-5">
+      <div class="container text-center px-3">
+        <div class="mb-3" aria-hidden="true">
+          <i class="fa-solid fa-fan hero-icon mx-1 fs-4"></i>
+          <i class="fa-solid fa-seedling hero-icon mx-1 fs-4"></i>
+          <i class="fa-solid fa-clover hero-icon mx-1 fs-4"></i>
+        </div>
+        <h1 class="display-4 fw-bold mb-2">Cherry Blossom in the GTA</h1>
+        <p class="lead mb-0 text-secondary">
+          Discover the best sakura spots across Toronto and nearby Ontario
+        </p>
+      </div>
+    </header>
+
+    <main class="py-4 py-md-5">
+      <div class="container">
+        <!-- ========== 2. Intro ========== -->
+        <section class="soft-card p-4 p-md-5 mb-4">
+          <h2 class="h3 mb-3">Your spring blossom companion</h2>
+          <p class="mb-3">
+            This guide highlights memorable cherry blossom spots across the GTA and
+            nearby Ontario—perfect for planning walks, photos, and relaxed day trips.
+            Search, sort, explore the map, and save your favorites into one simple plan.
+          </p>
+          <p class="intro-credit mb-0">
+            Curated with care by
+            <a
+              class="link-accent"
+              href="https://www.youtube.com/@NodesofTravel"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <i class="fa-brands fa-youtube me-1" aria-hidden="true"></i>Nodes of Travel
+            </a>
+          </p>
+        </section>
+
+        <!-- ========== 3. Search + sort ========== -->
+        <section class="soft-card p-3 p-md-4 mb-4">
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg-8">
+              <label for="searchInput" class="form-label fw-semibold mb-1">Search</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 rounded-start-3">
+                  <i class="fa-solid fa-magnifying-glass text-secondary"></i>
+                </span>
+                <input
+                  id="searchInput"
+                  type="search"
+                  class="form-control search-input border-start-0 rounded-end-3"
+                  placeholder="Search by spot name, city, or vibe..."
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <div class="col-12 col-lg-4">
+              <label for="sortSelect" class="form-label fw-semibold mb-1">Sort places</label>
+              <select id="sortSelect" class="form-select sort-select">
+                <option value="name">Name (A–Z)</option>
+                <option value="city">City (A–Z)</option>
+                <option value="bestTime">Best Time</option>
+                <option value="selectedFirst">Selected First</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 4. Featured carousel ========== -->
+        <section class="mb-4">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h2 class="h4 mb-0">Featured sakura picks</h2>
+            <span class="small text-muted">Swipe or scroll for more</span>
+          </div>
+          <div id="featuredCarousel" class="carousel-track" role="region" aria-label="Featured cherry blossom spots"></div>
+        </section>
+
+        <!-- ========== 5. Interactive map ========== -->
+        <section class="soft-card p-3 p-md-4 mb-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3">
+            <div>
+              <h2 class="h4 mb-1">Explore on the map</h2>
+              <p class="small text-muted mb-0">
+                Markers match your current search. Tap a pin for details and directions.
+              </p>
+            </div>
+            <button id="btnUseLocation" type="button" class="btn btn-outline-success btn-sm rounded-pill">
+              <i class="fa-solid fa-location-crosshairs me-1"></i>Use My Location
+            </button>
+          </div>
+          <div id="map" aria-label="Map of cherry blossom locations"></div>
+          <p id="geoMessage" class="map-note mt-2 mb-0" role="status"></p>
+          <p class="map-note mt-1 mb-0">
+            Live location works if you allow access in your browser. On a live site,
+            geolocation may require <strong>HTTPS</strong>.
+          </p>
+        </section>
+
+        <!-- ========== 6. Main list (table desktop / cards mobile) ========== -->
+        <section class="soft-card p-3 p-md-4 mb-5">
+          <h2 class="h4 mb-3">All spots — plan your outing</h2>
+
+          <!-- Desktop: table -->
+          <div class="table-responsive d-none d-md-block table-wrap">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Add to Plan</th>
+                  <th scope="col">Spot Name</th>
+                  <th scope="col">City</th>
+                  <th scope="col">Best Time / Vibe</th>
+                  <th scope="col">Address</th>
+                  <th scope="col">Maps</th>
+                </tr>
+              </thead>
+              <tbody id="spotTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Mobile: cards -->
+          <div id="spotCards" class="d-md-none"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- ========== 7. Floating plan button ========== -->
+    <button id="openPlanBtn" type="button" class="btn-floating-plan shadow">
+      <i class="fa-solid fa-seedling me-2" aria-hidden="true"></i>
+      My Sakura Plan
+      <span id="planCountBadge" class="plan-count-badge badge ms-2 rounded-pill">0</span>
+    </button>
+
+    <!-- ========== 8–9. Sidebar planner + share ========== -->
+    <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <aside id="planSidebar" class="plan-sidebar" aria-label="My Sakura Plan sidebar">
+      <div class="sidebar-head p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h3 class="h5 mb-0">My Sakura Plan</h3>
+          <button id="closeSidebarBtn" type="button" class="btn btn-sm btn-outline-secondary rounded-pill" aria-label="Close planner">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+      <div class="d-flex flex-column flex-grow-1 p-3">
+        <div id="planList" class="plan-scroll flex-grow-1 mb-3"></div>
+        <div id="shareSection" class="d-none">
+          <h4 class="h6 text-uppercase text-muted mb-2">Share Your Plan</h4>
+          <div class="d-grid gap-2">
+            <button id="shareWhatsAppBtn" type="button" class="btn btn-success rounded-pill">
+              <i class="fa-brands fa-whatsapp me-2"></i>WhatsApp Share
+            </button>
+            <button id="shareEmailBtn" type="button" class="btn btn-primary rounded-pill">
+              <i class="fa-solid fa-envelope me-2"></i>Email Share
+            </button>
+            <button id="copyPlanBtn" type="button" class="btn btn-share-soft rounded-pill">
+              <i class="fa-solid fa-copy me-2"></i>Copy Text
+            </button>
+          </div>
+        </div>
+        <p id="shareEmptyHint" class="small text-muted mt-auto mb-0 pt-2">
+          Select at least one spot to share your plan.
+        </p>
+      </div>
+    </aside>
+
+    <!-- ========== 10. Footer ========== -->
+    <footer class="site-footer py-4">
+      <div class="container text-center px-3">
+        <p class="fw-semibold mb-1">Happy Sakura Season!</p>
+        <p class="small text-secondary mb-0">
+          Bloom timing may vary with weather. Please be gentle with blossoms.
+        </p>
+      </div>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <script>
+      /**
+       * Cherry Blossom in the GTA — single-file static guide
+       * Data: local array | UI: Bootstrap + custom CSS | Map: Leaflet + OSM
+       */
+
+      // ---- Data: 10 locations (editable) ----
+      const spots = [
+        {
+          id: 1,
+          name: "High Park",
+          city: "Toronto",
+          vibe: "Toronto’s most iconic cherry blossom destination",
+          address: "1873 Bloor St W, Toronto, ON M6R 2Z3",
+          description: "Classic sakura paths and spring energy—arrive early on peak weekends.",
+          mapsLink: "https://maps.google.com/?q=High+Park+Toronto",
+          bestTime: "Late April to early May",
+          tags: ["iconic", "photography", "walking", "family-friendly"],
+          featured: true,
+          badge: "Iconic",
+          lat: 43.6465,
+          lng: -79.4637,
+        },
+        {
+          id: 2,
+          name: "Kariya Park",
+          city: "Mississauga",
+          vibe: "Peaceful Japanese-inspired setting in Mississauga",
+          address: "3620 Kariya Dr, Mississauga, ON L5B 3J2",
+          description: "Calm ponds, bridges, and a serene garden mood—great for quiet photos.",
+          mapsLink: "https://maps.google.com/?q=Kariya+Park+Mississauga",
+          bestTime: "Late April",
+          tags: ["quiet", "japanese-garden", "local-favorite"],
+          featured: true,
+          badge: "Quiet",
+          lat: 43.5775,
+          lng: -79.6428,
+        },
+        {
+          id: 3,
+          name: "Centennial Park",
+          city: "Etobicoke",
+          vibe: "Spacious west-end blossom outing",
+          address: "256 Centennial Park Rd, Etobicoke, ON M9C 5N1",
+          description: "Room to spread out—easy pick for picnics and relaxed strolls.",
+          mapsLink: "https://maps.google.com/?q=Centennial+Park+Etobicoke",
+          bestTime: "Late April to early May",
+          tags: ["picnic", "west-end", "spacious"],
+          featured: false,
+          badge: "Local",
+          lat: 43.6439,
+          lng: -79.5957,
+        },
+        {
+          id: 4,
+          name: "Trinity Bellwoods Park",
+          city: "Toronto",
+          vibe: "Lively downtown local favorite",
+          address: "790 Queen St W, Toronto, ON M6J 1G3",
+          description: "Neighborhood energy with a downtown spring vibe.",
+          mapsLink: "https://maps.google.com/?q=Trinity+Bellwoods+Park",
+          bestTime: "Late April",
+          tags: ["downtown", "social", "local-favorite"],
+          featured: true,
+          badge: "Campus",
+          lat: 43.6479,
+          lng: -79.4199,
+        },
+        {
+          id: 5,
+          name: "Royal Botanical Gardens",
+          city: "Burlington",
+          vibe: "Scenic botanical experience",
+          address: "680 Plains Rd W, Burlington, ON L7T 4H4",
+          description: "Garden trails and spring color—ideal for a longer visit.",
+          mapsLink: "https://maps.google.com/?q=Royal+Botanical+Gardens+Burlington",
+          bestTime: "Late April to May",
+          tags: ["botanical", "nature", "day-trip"],
+          featured: true,
+          badge: "Day Trip",
+          lat: 43.2904,
+          lng: -79.8745,
+        },
+        {
+          id: 6,
+          name: "Exhibition Place",
+          city: "Toronto",
+          vibe: "Seasonal stop near the waterfront",
+          address: "100 Princes' Blvd, Toronto, ON M6K 3C3",
+          description: "Handy city stop when you want blossoms plus lake-adjacent energy.",
+          mapsLink: "https://maps.google.com/?q=Exhibition+Place+Toronto",
+          bestTime: "Late April",
+          tags: ["waterfront", "city", "easy-access"],
+          featured: false,
+          badge: "Waterfront",
+          lat: 43.6336,
+          lng: -79.4176,
+        },
+        {
+          id: 7,
+          name: "Spencer Smith Park",
+          city: "Burlington",
+          vibe: "Lakeside Burlington outing",
+          address: "1400 Lakeshore Rd, Burlington, ON L7S 1Y5",
+          description: "Water views and open paths—lovely for a spring afternoon.",
+          mapsLink: "https://maps.google.com/?q=Spencer+Smith+Park+Burlington",
+          bestTime: "Late April to early May",
+          tags: ["lakeside", "family-friendly", "day-trip"],
+          featured: true,
+          badge: "Waterfront",
+          lat: 43.3169,
+          lng: -79.8003,
+        },
+        {
+          id: 8,
+          name: "Niagara Parks Botanical Gardens",
+          city: "Niagara Falls",
+          vibe: "Beautiful day-trip garden option",
+          address: "2565 Niagara Pkwy, Niagara Falls, ON L2E 6S4",
+          description: "A colorful garden destination—pair with a Niagara day out.",
+          mapsLink: "https://maps.google.com/?q=Niagara+Parks+Botanical+Gardens",
+          bestTime: "Late April to May",
+          tags: ["niagara", "garden", "day-trip", "photography"],
+          featured: true,
+          badge: "Day Trip",
+          lat: 43.0789,
+          lng: -79.0754,
+        },
+        {
+          id: 9,
+          name: "Robarts Library / U of T St. George",
+          city: "Toronto",
+          vibe: "Urban campus blossoms",
+          address: "130 St George St, Toronto, ON M5S 1A5",
+          description: "City-campus sakura pockets with a unique urban backdrop.",
+          mapsLink: "https://maps.google.com/?q=Robarts+Library+Toronto",
+          bestTime: "Late April",
+          tags: ["campus", "urban", "central"],
+          featured: false,
+          badge: "Campus",
+          lat: 43.6644,
+          lng: -79.4006,
+        },
+        {
+          id: 10,
+          name: "Joyce Archdekin Park",
+          city: "Brampton",
+          vibe: "Accessible Brampton local option",
+          address: "Main St S & Nanwood Dr, Brampton, ON L6W 3T8",
+          description: "A practical local pick when you want blossoms close to home.",
+          mapsLink: "https://maps.google.com/?q=Joyce+Archdekin+Park+Brampton",
+          bestTime: "Late April to early May",
+          tags: ["brampton", "local", "accessible"],
+          featured: false,
+          badge: "Local",
+          lat: 43.6856,
+          lng: -79.7593,
+        },
+      ];
+
+      /** @type {Set<number>} */
+      const selectedSpotIds = new Set();
+      /** @type {typeof spots} */
+      let filteredSpots = [...spots];
+
+      let map = null;
+      let markerLayer = null;
+      let userMarker = null;
+
+      // ---- DOM refs ----
+      const searchInput = document.getElementById("searchInput");
+      const sortSelect = document.getElementById("sortSelect");
+      const featuredCarousel = document.getElementById("featuredCarousel");
+      const spotTableBody = document.getElementById("spotTableBody");
+      const spotCards = document.getElementById("spotCards");
+      const openPlanBtn = document.getElementById("openPlanBtn");
+      const planCountBadge = document.getElementById("planCountBadge");
+      const planSidebar = document.getElementById("planSidebar");
+      const sidebarOverlay = document.getElementById("sidebarOverlay");
+      const closeSidebarBtn = document.getElementById("closeSidebarBtn");
+      const planList = document.getElementById("planList");
+      const shareSection = document.getElementById("shareSection");
+      const shareEmptyHint = document.getElementById("shareEmptyHint");
+      const shareWhatsAppBtn = document.getElementById("shareWhatsAppBtn");
+      const shareEmailBtn = document.getElementById("shareEmailBtn");
+      const copyPlanBtn = document.getElementById("copyPlanBtn");
+      const btnUseLocation = document.getElementById("btnUseLocation");
+      const geoMessage = document.getElementById("geoMessage");
+
+      /**
+       * Filter by search, then sort — single source of truth for list + map markers.
+       */
+      function applyFilterAndSort() {
+        const q = searchInput.value.toLowerCase().trim();
+        filteredSpots = spots.filter((spot) => {
+          const blob = [
+            spot.name,
+            spot.city,
+            spot.description,
+            spot.vibe,
+            spot.bestTime,
+            ...(spot.tags || []),
+          ]
+            .join(" ")
+            .toLowerCase();
+          return blob.includes(q);
+        });
+
+        const mode = sortSelect.value;
+        filteredSpots.sort((a, b) => {
+          if (mode === "city") {
+            return a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
+          }
+          if (mode === "bestTime") {
+            return a.bestTime.localeCompare(b.bestTime) || a.name.localeCompare(b.name);
+          }
+          if (mode === "selectedFirst") {
+            const as = selectedSpotIds.has(a.id) ? 0 : 1;
+            const bs = selectedSpotIds.has(b.id) ? 0 : 1;
+            return as - bs || a.name.localeCompare(b.name);
+          }
+          return a.name.localeCompare(b.name);
+        });
+
+        renderFeaturedCarousel();
+        renderTable();
+        renderCards();
+        renderMapMarkers();
+      }
+
+      function handleSearch() {
+        applyFilterAndSort();
+      }
+
+      function handleSort() {
+        applyFilterAndSort();
+      }
+
+      /**
+       * Featured horizontal cards: only featured spots that pass current filter.
+       */
+      function renderFeaturedCarousel() {
+        const featured = filteredSpots.filter((s) => s.featured).slice(0, 6);
+        if (!featured.length) {
+          featuredCarousel.innerHTML = `
+            <div class="empty-pill p-3 text-center w-100">
+              <span class="small">No featured picks match your search—try clearing the search box.</span>
+            </div>`;
+          return;
+        }
+
+        featuredCarousel.innerHTML = featured
+          .map(
+            (spot) => `
+            <article class="featured-card p-3 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                  <h3 class="h6 mb-1">${spot.name}</h3>
+                  <p class="small text-muted mb-0">${spot.city}</p>
+                </div>
+                <span class="badge-sakura">${spot.badge}</span>
+              </div>
+              <p class="small flex-grow-1 mb-2">${spot.vibe}</p>
+              <p class="small mb-2"><strong>Best time:</strong> ${spot.bestTime}</p>
+              <div class="d-flex align-items-center justify-content-between gap-2 mt-auto">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="feat-${spot.id}"
+                    ${selectedSpotIds.has(spot.id) ? "checked" : ""}
+                    data-spot-id="${spot.id}"
+                  />
+                  <label class="form-check-label small" for="feat-${spot.id}">Add to Plan</label>
+                </div>
+                <a class="link-accent small" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">View on Map</a>
+              </div>
+            </article>`
+          )
+          .join("");
+
+        featuredCarousel.querySelectorAll('input[data-spot-id]').forEach((el) => {
+          el.addEventListener("change", () => {
+            const id = Number(el.getAttribute("data-spot-id"));
+            toggleSpotSelection(id);
+          });
+        });
+      }
+
+      /** Initialize Leaflet map once */
+      function initMap() {
+        if (map) return;
+        map = L.map("map", { scrollWheelZoom: true }).setView([43.65, -79.38], 9);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(map);
+        markerLayer = L.layerGroup().addTo(map);
+        renderMapMarkers();
+        setTimeout(() => map.invalidateSize(), 300);
+      }
+
+      /** Draw markers for current filteredSpots */
+      function renderMapMarkers() {
+        if (!map || !markerLayer) return;
+        markerLayer.clearLayers();
+        const bounds = [];
+
+        filteredSpots.forEach((spot) => {
+          const m = L.marker([spot.lat, spot.lng]);
+          m.bindPopup(
+            `<strong>${spot.name}</strong><br>${spot.city}<br><span class="small">${spot.description}</span><br><em>Best:</em> ${spot.bestTime}<br><a href="${spot.mapsLink}" target="_blank" rel="noopener">Google Maps</a>`
+          );
+          m.addTo(markerLayer);
+          bounds.push([spot.lat, spot.lng]);
+        });
+
+        if (bounds.length === 1) {
+          map.setView(bounds[0], 12);
+        } else if (bounds.length > 1) {
+          map.fitBounds(bounds, { padding: [28, 28] });
+        }
+
+        if (userMarker) {
+          userMarker.addTo(markerLayer);
+        }
+      }
+
+      /** Browser geolocation + friendly errors */
+      function useMyLocation() {
+        geoMessage.textContent = "";
+        if (!navigator.geolocation) {
+          geoMessage.textContent =
+            "Your browser doesn’t support location services. You can still explore the map manually.";
+          return;
+        }
+        geoMessage.textContent = "Requesting your location…";
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            if (!map) initMap();
+            if (userMarker) {
+              map.removeLayer(userMarker);
+              userMarker = null;
+            }
+            userMarker = L.circleMarker([latitude, longitude], {
+              radius: 10,
+              color: "#1e6b4a",
+              fillColor: "#5cb85c",
+              fillOpacity: 0.85,
+            }).bindPopup("<strong>You are here</strong>");
+            userMarker.addTo(markerLayer);
+            map.setView([latitude, longitude], 12);
+            geoMessage.textContent = "Location found — you’re on the map.";
+          },
+          () => {
+            geoMessage.textContent =
+              "We couldn’t read your location (permission denied or unavailable). Try again or browse the pins manually.";
+          },
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+      }
+
+      /** Desktop table */
+      function renderTable() {
+        if (!filteredSpots.length) {
+          spotTableBody.innerHTML = `
+            <tr>
+              <td colspan="6">
+                <div class="empty-pill p-4 text-center">
+                  <p class="mb-1 fw-semibold">No spots match your search</p>
+                  <p class="small text-muted mb-0">Try another keyword or clear the search box.</p>
+                </div>
+              </td>
+            </tr>`;
+          return;
+        }
+
+        spotTableBody.innerHTML = filteredSpots
+          .map(
+            (spot) => `
+            <tr>
+              <td>
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  ${selectedSpotIds.has(spot.id) ? "checked" : ""}
+                  aria-label="Add ${spot.name} to plan"
+                  data-table-id="${spot.id}"
+                />
+              </td>
+              <td class="fw-semibold">${spot.name}</td>
+              <td>${spot.city}</td>
+              <td>
+                <div class="small fw-semibold">${spot.bestTime}</div>
+                <div class="small text-muted">${spot.vibe}</div>
+              </td>
+              <td>${spot.address}</td>
+              <td><a class="link-accent" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">Open Map</a></td>
+            </tr>`
+          )
+          .join("");
+
+        spotTableBody.querySelectorAll("input[data-table-id]").forEach((el) => {
+          el.addEventListener("change", () => {
+            toggleSpotSelection(Number(el.getAttribute("data-table-id")));
+          });
+        });
+      }
+
+      /** Mobile cards */
+      function renderCards() {
+        if (!filteredSpots.length) {
+          spotCards.innerHTML = `
+            <div class="empty-pill p-4 text-center">
+              <p class="mb-1 fw-semibold">No matching sakura spots</p>
+              <p class="small text-muted mb-0">Adjust your search or sort to see more places.</p>
+            </div>`;
+          return;
+        }
+
+        spotCards.innerHTML = filteredSpots
+          .map(
+            (spot) => `
+            <div class="spot-card p-3 mb-3">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <h3 class="h6 mb-0">${spot.name}</h3>
+                <input
+                  class="form-check-input flex-shrink-0"
+                  type="checkbox"
+                  ${selectedSpotIds.has(spot.id) ? "checked" : ""}
+                  aria-label="Add ${spot.name} to plan"
+                  data-card-id="${spot.id}"
+                />
+              </div>
+              <p class="small mb-1"><strong>City:</strong> ${spot.city}</p>
+              <p class="small mb-1"><strong>Best time:</strong> ${spot.bestTime}</p>
+              <p class="small mb-1"><strong>Vibe:</strong> ${spot.vibe}</p>
+              <p class="small mb-2"><strong>Address:</strong> ${spot.address}</p>
+              <p class="small text-muted mb-2">${spot.description}</p>
+              <a class="link-accent small" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">Open Map</a>
+            </div>`
+          )
+          .join("");
+
+        spotCards.querySelectorAll("input[data-card-id]").forEach((el) => {
+          el.addEventListener("change", () => {
+            toggleSpotSelection(Number(el.getAttribute("data-card-id")));
+          });
+        });
+      }
+
+      function toggleSpotSelection(spotId) {
+        if (selectedSpotIds.has(spotId)) {
+          selectedSpotIds.delete(spotId);
+        } else {
+          selectedSpotIds.add(spotId);
+        }
+        applyFilterAndSort();
+        renderPlan();
+        updatePlanCount();
+      }
+
+      function renderPlan() {
+        const chosen = spots.filter((s) => selectedSpotIds.has(s.id));
+        if (!chosen.length) {
+          planList.innerHTML = `
+            <div class="empty-pill p-4 text-center">
+              <p class="mb-1 fw-semibold">Your plan is empty</p>
+              <p class="small text-muted mb-0">Check “Add to Plan” on any spot to build your sakura list.</p>
+            </div>`;
+          shareSection.classList.add("d-none");
+          shareEmptyHint.classList.remove("d-none");
+          return;
+        }
+
+        planList.innerHTML = chosen
+          .map(
+            (spot) => `
+            <div class="plan-item p-3 mb-2">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                <h4 class="h6 mb-0">${spot.name}</h4>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" data-remove-id="${spot.id}">Remove</button>
+              </div>
+              <p class="small mb-1"><strong>City:</strong> ${spot.city}</p>
+              <p class="small text-muted mb-2">${spot.description}</p>
+              <a class="link-accent small" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">Maps</a>
+            </div>`
+          )
+          .join("");
+
+        planList.querySelectorAll("[data-remove-id]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            toggleSpotSelection(Number(btn.getAttribute("data-remove-id")));
+          });
+        });
+
+        shareSection.classList.remove("d-none");
+        shareEmptyHint.classList.add("d-none");
+      }
+
+      function updatePlanCount() {
+        planCountBadge.textContent = String(selectedSpotIds.size);
+      }
+
+      /** Share body: emoji header + numbered spots + footer line */
+      function generatePlanText() {
+        const chosen = spots.filter((s) => selectedSpotIds.has(s.id));
+        if (!chosen.length) {
+          return "";
+        }
+        const blocks = chosen.map((spot, i) => {
+          return `${i + 1}. ${spot.name}
+   City: ${spot.city}
+   Best Time: ${spot.bestTime}
+   Address: ${spot.address}
+   Maps: ${spot.mapsLink}`;
+        });
+        return `🌸 My Cherry Blossom Plan 🌸
+
+${blocks.join("\n\n")}
+
+Happy Sakura Season!`;
+      }
+
+      function shareToWhatsApp() {
+        const text = generatePlanText();
+        if (!text) return;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      }
+
+      function shareToEmail() {
+        const text = generatePlanText();
+        if (!text) return;
+        const subject = "My Cherry Blossom Plan";
+        window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+      }
+
+      async function copyPlanText() {
+        const text = generatePlanText();
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = copyPlanBtn.innerHTML;
+          copyPlanBtn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Copied!';
+          setTimeout(() => {
+            copyPlanBtn.innerHTML = original;
+          }, 1800);
+        } catch {
+          alert("Could not copy automatically. Select and copy the text from your email or WhatsApp draft.");
+        }
+      }
+
+      function openSidebar() {
+        planSidebar.classList.add("open");
+        sidebarOverlay.classList.add("show");
+        sidebarOverlay.setAttribute("aria-hidden", "false");
+      }
+
+      function closeSidebar() {
+        planSidebar.classList.remove("open");
+        sidebarOverlay.classList.remove("show");
+        sidebarOverlay.setAttribute("aria-hidden", "true");
+      }
+
+      // ---- Events ----
+      searchInput.addEventListener("input", handleSearch);
+      sortSelect.addEventListener("change", handleSort);
+      openPlanBtn.addEventListener("click", openSidebar);
+      closeSidebarBtn.addEventListener("click", closeSidebar);
+      sidebarOverlay.addEventListener("click", closeSidebar);
+      shareWhatsAppBtn.addEventListener("click", shareToWhatsApp);
+      shareEmailBtn.addEventListener("click", shareToEmail);
+      copyPlanBtn.addEventListener("click", copyPlanText);
+      btnUseLocation.addEventListener("click", useMyLocation);
+
+      // ---- Boot ----
+      applyFilterAndSort();
+      renderPlan();
+      updatePlanCount();
+      initMap();
+    </script>
+  </body>
+</html>
