@@ -209,6 +209,31 @@
         box-shadow: var(--shadow-soft);
       }
 
+      /* Nearest-spot highlight (when user location is on) */
+      tr.closest-row > td {
+        background: rgba(168, 196, 162, 0.22) !important;
+        box-shadow: inset 3px 0 0 var(--muted-green);
+      }
+
+      .featured-card.closest-card {
+        border-color: rgba(168, 196, 162, 0.65);
+        box-shadow: 0 0 0 2px rgba(168, 196, 162, 0.35), var(--shadow-soft);
+      }
+
+      .spot-card.closest-spot {
+        border-color: rgba(168, 196, 162, 0.55);
+        box-shadow: 0 0 0 2px rgba(168, 196, 162, 0.25);
+      }
+
+      .badge-closest {
+        background: linear-gradient(135deg, #e8f4e4, #d4ead0);
+        color: #3d5c38;
+        font-weight: 600;
+        font-size: 0.68rem;
+        border-radius: 999px;
+        padding: 0.25rem 0.5rem;
+      }
+
       /* --- Floating plan button --- */
       .btn-floating-plan {
         position: fixed;
@@ -375,6 +400,7 @@
                 <option value="city">City (A–Z)</option>
                 <option value="bestTime">Best Time</option>
                 <option value="selectedFirst">Selected First</option>
+                <option value="nearest">Nearest to Me</option>
               </select>
             </div>
           </div>
@@ -404,6 +430,7 @@
           </div>
           <div id="map" aria-label="Map of cherry blossom locations"></div>
           <p id="geoMessage" class="map-note mt-2 mb-0" role="status"></p>
+          <p id="locationStatusLine" class="map-note mt-1 mb-0" aria-live="polite"></p>
           <p class="map-note mt-1 mb-0">
             Live location works if you allow access in your browser. On a live site,
             geolocation may require <strong>HTTPS</strong>.
@@ -424,6 +451,7 @@
                   <th scope="col">City</th>
                   <th scope="col">Best Time / Vibe</th>
                   <th scope="col">Address</th>
+                  <th scope="col">Distance</th>
                   <th scope="col">Maps</th>
                 </tr>
               </thead>
@@ -662,6 +690,8 @@
       let map = null;
       let markerLayer = null;
       let userMarker = null;
+      /** Last known user coordinates from “Use My Location” (null until fix succeeds). */
+      let userLocation = null;
 
       // ---- DOM refs ----
       const searchInput = document.getElementById("searchInput");
@@ -682,6 +712,60 @@
       const copyPlanBtn = document.getElementById("copyPlanBtn");
       const btnUseLocation = document.getElementById("btnUseLocation");
       const geoMessage = document.getElementById("geoMessage");
+      const locationStatusLine = document.getElementById("locationStatusLine");
+
+      /**
+       * Haversine distance between two WGS84 points; returns kilometers.
+       */
+      function calculateDistanceKm(lat1, lng1, lat2, lng2) {
+        const R = 6371;
+        const toRad = (deg) => (deg * Math.PI) / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      /** Distance from stored user location to a spot, or null if location unavailable. */
+      function getSpotDistanceKm(spot) {
+        if (!userLocation) return null;
+        return calculateDistanceKm(userLocation.lat, userLocation.lng, spot.lat, spot.lng);
+      }
+
+      /** One decimal km for display. */
+      function formatKm(km) {
+        return `${Math.round(km * 10) / 10} km`;
+      }
+
+      /** ID of the nearest spot in the current filtered list (for badges / highlights). */
+      function getClosestFilteredSpotId() {
+        if (!userLocation || !filteredSpots.length) return null;
+        let bestId = null;
+        let bestD = Infinity;
+        for (const s of filteredSpots) {
+          const d = getSpotDistanceKm(s);
+          if (d < bestD) {
+            bestD = d;
+            bestId = s.id;
+          }
+        }
+        return bestId;
+      }
+
+      /** Non-intrusive hint under the map: distances active, or “nearest” sort needs location. */
+      function updateLocationStatusLine() {
+        if (!locationStatusLine) return;
+        if (userLocation) {
+          locationStatusLine.textContent = "Distances shown from your current location.";
+        } else if (sortSelect.value === "nearest") {
+          locationStatusLine.textContent = "Use My Location to sort by nearest.";
+        } else {
+          locationStatusLine.textContent = "";
+        }
+      }
 
       /**
        * Filter by search, then sort — single source of truth for list + map markers.
@@ -715,9 +799,18 @@
             const bs = selectedSpotIds.has(b.id) ? 0 : 1;
             return as - bs || a.name.localeCompare(b.name);
           }
+          if (mode === "nearest") {
+            if (userLocation) {
+              const da = getSpotDistanceKm(a);
+              const db = getSpotDistanceKm(b);
+              return (da ?? 0) - (db ?? 0) || a.name.localeCompare(b.name);
+            }
+            return a.name.localeCompare(b.name);
+          }
           return a.name.localeCompare(b.name);
         });
 
+        updateLocationStatusLine();
         renderFeaturedCarousel();
         renderTable();
         renderCards();
@@ -737,6 +830,7 @@
        */
       function renderFeaturedCarousel() {
         const featured = filteredSpots.filter((s) => s.featured).slice(0, 6);
+        const closestId = getClosestFilteredSpotId();
         if (!featured.length) {
           featuredCarousel.innerHTML = `
             <div class="empty-pill p-3 text-center w-100">
@@ -747,16 +841,31 @@
 
         featuredCarousel.innerHTML = featured
           .map(
-            (spot) => `
-            <article class="featured-card p-3 d-flex flex-column">
+            (spot) => {
+              const dKm = getSpotDistanceKm(spot);
+              const distLine =
+                dKm != null
+                  ? `<p class="small text-muted mb-2"><strong>${formatKm(dKm)}</strong> away</p>`
+                  : `<p class="small text-muted mb-2">Enable location to see distance</p>`;
+              const closestBadge =
+                userLocation && closestId === spot.id
+                  ? `<span class="badge-closest ms-1">Closest</span>`
+                  : "";
+              const cardClass =
+                userLocation && closestId === spot.id ? "featured-card closest-card" : "featured-card";
+              return `
+            <article class="${cardClass} p-3 d-flex flex-column">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                 <div>
                   <h3 class="h6 mb-1">${spot.name}</h3>
                   <p class="small text-muted mb-0">${spot.city}</p>
                 </div>
-                <span class="badge-sakura">${spot.badge}</span>
+                <div class="text-end">
+                  <span class="badge-sakura">${spot.badge}</span>${closestBadge}
+                </div>
               </div>
               <p class="small flex-grow-1 mb-2">${spot.vibe}</p>
+              ${distLine}
               <p class="small mb-2"><strong>Best time:</strong> ${spot.bestTime}</p>
               <div class="d-flex align-items-center justify-content-between gap-2 mt-auto">
                 <div class="form-check">
@@ -771,7 +880,8 @@
                 </div>
                 <a class="link-accent small" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">View on Map</a>
               </div>
-            </article>`
+            </article>`;
+            }
           )
           .join("");
 
@@ -804,8 +914,13 @@
 
         filteredSpots.forEach((spot) => {
           const m = L.marker([spot.lat, spot.lng]);
+          const dKm = getSpotDistanceKm(spot);
+          const distHtml =
+            dKm != null
+              ? `<br><strong>Distance:</strong> ${formatKm(dKm)}`
+              : `<br><strong>Distance:</strong> enable location`;
           m.bindPopup(
-            `<strong>${spot.name}</strong><br>${spot.city}<br><span class="small">${spot.description}</span><br><em>Best:</em> ${spot.bestTime}<br><a href="${spot.mapsLink}" target="_blank" rel="noopener">Google Maps</a>`
+            `<strong>${spot.name}</strong><br>${spot.city}<br><span class="small">${spot.description}</span><br><em>Best:</em> ${spot.bestTime}${distHtml}<br><a href="${spot.mapsLink}" target="_blank" rel="noopener">Google Maps</a>`
           );
           m.addTo(markerLayer);
           bounds.push([spot.lat, spot.lng]);
@@ -834,6 +949,7 @@
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const { latitude, longitude } = pos.coords;
+            userLocation = { lat: latitude, lng: longitude };
             if (!map) initMap();
             if (userMarker) {
               map.removeLayer(userMarker);
@@ -848,6 +964,10 @@
             userMarker.addTo(markerLayer);
             map.setView([latitude, longitude], 12);
             geoMessage.textContent = "Location found — you’re on the map.";
+            updateLocationStatusLine();
+            applyFilterAndSort();
+            renderPlan();
+            updatePlanCount();
           },
           () => {
             geoMessage.textContent =
@@ -862,7 +982,7 @@
         if (!filteredSpots.length) {
           spotTableBody.innerHTML = `
             <tr>
-              <td colspan="6">
+              <td colspan="7">
                 <div class="empty-pill p-4 text-center">
                   <p class="mb-1 fw-semibold">No spots match your search</p>
                   <p class="small text-muted mb-0">Try another keyword or clear the search box.</p>
@@ -872,10 +992,15 @@
           return;
         }
 
+        const closestId = getClosestFilteredSpotId();
         spotTableBody.innerHTML = filteredSpots
           .map(
-            (spot) => `
-            <tr>
+            (spot) => {
+              const dKm = getSpotDistanceKm(spot);
+              const distCell = dKm != null ? formatKm(dKm) : "—";
+              const rowClass = userLocation && closestId === spot.id ? "closest-row" : "";
+              return `
+            <tr class="${rowClass}">
               <td>
                 <input
                   class="form-check-input"
@@ -892,8 +1017,10 @@
                 <div class="small text-muted">${spot.vibe}</div>
               </td>
               <td>${spot.address}</td>
+              <td class="small">${distCell}</td>
               <td><a class="link-accent" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">Open Map</a></td>
-            </tr>`
+            </tr>`;
+            }
           )
           .join("");
 
@@ -915,10 +1042,18 @@
           return;
         }
 
+        const closestId = getClosestFilteredSpotId();
         spotCards.innerHTML = filteredSpots
           .map(
-            (spot) => `
-            <div class="spot-card p-3 mb-3">
+            (spot) => {
+              const dKm = getSpotDistanceKm(spot);
+              const distLine =
+                dKm != null
+                  ? `<p class="small mb-1"><strong>Distance:</strong> ${formatKm(dKm)}</p>`
+                  : `<p class="small mb-1 text-muted"><strong>Distance:</strong> Enable location</p>`;
+              const cardExtra = userLocation && closestId === spot.id ? " closest-spot" : "";
+              return `
+            <div class="spot-card p-3 mb-3${cardExtra}">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                 <h3 class="h6 mb-0">${spot.name}</h3>
                 <input
@@ -930,12 +1065,14 @@
                 />
               </div>
               <p class="small mb-1"><strong>City:</strong> ${spot.city}</p>
+              ${distLine}
               <p class="small mb-1"><strong>Best time:</strong> ${spot.bestTime}</p>
               <p class="small mb-1"><strong>Vibe:</strong> ${spot.vibe}</p>
               <p class="small mb-2"><strong>Address:</strong> ${spot.address}</p>
               <p class="small text-muted mb-2">${spot.description}</p>
               <a class="link-accent small" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">Open Map</a>
-            </div>`
+            </div>`;
+            }
           )
           .join("");
 
@@ -972,16 +1109,24 @@
 
         planList.innerHTML = chosen
           .map(
-            (spot) => `
+            (spot) => {
+              const dKm = getSpotDistanceKm(spot);
+              const distLine =
+                dKm != null
+                  ? `<p class="small mb-1 text-muted"><strong>Distance:</strong> ${formatKm(dKm)}</p>`
+                  : "";
+              return `
             <div class="plan-item p-3 mb-2">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                 <h4 class="h6 mb-0">${spot.name}</h4>
                 <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" data-remove-id="${spot.id}">Remove</button>
               </div>
               <p class="small mb-1"><strong>City:</strong> ${spot.city}</p>
+              ${distLine}
               <p class="small text-muted mb-2">${spot.description}</p>
               <a class="link-accent small" href="${spot.mapsLink}" target="_blank" rel="noopener noreferrer">Maps</a>
-            </div>`
+            </div>`;
+            }
           )
           .join("");
 
@@ -1071,6 +1216,7 @@ Happy Sakura Season!`;
       btnUseLocation.addEventListener("click", useMyLocation);
 
       // ---- Boot ----
+      updateLocationStatusLine();
       applyFilterAndSort();
       renderPlan();
       updatePlanCount();
