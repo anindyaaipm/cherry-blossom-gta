@@ -209,12 +209,6 @@
         box-shadow: var(--shadow-soft);
       }
 
-      /* Nearest-spot highlight (when user location is on) */
-      tr.closest-row > td {
-        background: rgba(168, 196, 162, 0.22) !important;
-        box-shadow: inset 3px 0 0 var(--muted-green);
-      }
-
       .featured-card.closest-card {
         border-color: rgba(168, 196, 162, 0.65);
         box-shadow: 0 0 0 2px rgba(168, 196, 162, 0.35), var(--shadow-soft);
@@ -997,10 +991,14 @@
           .map(
             (spot) => {
               const dKm = getSpotDistanceKm(spot);
-              const distCell = dKm != null ? formatKm(dKm) : "—";
-              const rowClass = userLocation && closestId === spot.id ? "closest-row" : "";
+              const isClosest = userLocation && closestId === spot.id;
+              const distCell =
+                dKm != null
+                  ? `${formatKm(dKm)} ${isClosest ? '<span class="badge-closest ms-1">Closest</span>' : ""}`
+                  : "—";
+
               return `
-            <tr class="${rowClass}">
+            <tr>
               <td>
                 <input
                   class="form-check-input"
@@ -1049,7 +1047,7 @@
               const dKm = getSpotDistanceKm(spot);
               const distLine =
                 dKm != null
-                  ? `<p class="small mb-1"><strong>Distance:</strong> ${formatKm(dKm)}</p>`
+                  ? `<p class="small mb-1"><strong>Distance:</strong> ${formatKm(dKm)}${userLocation && closestId === spot.id ? ' <span class="badge-closest ms-1">Closest</span>' : ""}</p>`
                   : `<p class="small mb-1 text-muted"><strong>Distance:</strong> Enable location</p>`;
               const cardExtra = userLocation && closestId === spot.id ? " closest-spot" : "";
               return `
@@ -1107,13 +1105,14 @@
           return;
         }
 
+        const closestId = getClosestFilteredSpotId();
         planList.innerHTML = chosen
           .map(
             (spot) => {
               const dKm = getSpotDistanceKm(spot);
               const distLine =
                 dKm != null
-                  ? `<p class="small mb-1 text-muted"><strong>Distance:</strong> ${formatKm(dKm)}</p>`
+                  ? `<p class="small mb-1 text-muted"><strong>Distance:</strong> ${formatKm(dKm)}${userLocation && closestId === spot.id ? ' <span class="badge-closest ms-1">Closest</span>' : ""}</p>`
                   : "";
               return `
             <div class="plan-item p-3 mb-2">
